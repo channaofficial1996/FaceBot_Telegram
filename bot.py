@@ -17,9 +17,9 @@ gender_keyboard = [["🧑‍🎨 ប្រុស", "👩‍🎨 ស្រី"]]
 count_keyboard = [["1", "5", "10"]]
 
 # Environment variables
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY")
-RUNPOD_API_SECRET = os.getenv("RUNPOD_API_SECRET")
+BOT_TOKEN = os.getenv("7942349035:AAG81GZeNw5-daNz8rHOSG6shxx2D14HCsA")
+RUNPOD_API_KEY = os.getenv("user_2yxWJm4DyLIB69789HCyKWrWPrT")
+RUNPOD_API_SECRET = os.getenv("rps_QDCZANA9QSBRO7F9GZYA55ZB1ZXAH0YKI9NTLSLCqu5cjg")
 
 # Start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
