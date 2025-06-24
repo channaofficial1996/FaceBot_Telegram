@@ -1,25 +1,14 @@
+# FaceBot_Telegram V1.4
 
-📖 FaceBot Telegram - Installation Guide
+✅ Auto-delete webhook before starting polling
 
-1. Install Requirements
------------------------
-pip install -r requirements.txt
+## Deploy
 
-2. Configure Environment
-------------------------
-Copy .env.template to .env and fill in:
-- BOT_TOKEN=your_telegram_bot_token
-- RUNPOD_API_KEY=your_runpod_api_key
-- RUNPOD_API_SECRET=your_runpod_secret_key
+1. Rename `.env.template` to `.env` and fill in:
+   - BOT_TOKEN
+   - RUNPOD_API_KEY
+   - RUNPOD_API_SECRET
 
-3. Run Locally
---------------
-python bot.py
+2. Push to Railway
 
-4. Deploy to Railway
---------------------
-Upload project, set environment variables, click Deploy!
-
-✅ Buttons:
-- 🧑‍🎨 ប្រុស / 👩‍🎨 ស្រី
-- Select image count: 1, 5, 10
+3. Done 🎉
