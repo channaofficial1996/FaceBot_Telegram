@@ -12,19 +12,16 @@ from telegram.ext import (
 )
 import requests
 
-# Enable logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO
 )
 
-# States for conversation
 GENDER, COUNT = range(2)
 
-# Keyboard options
 gender_keyboard = [["🧑‍🎨 ប្រុស", "👩‍🎨 ស្រី"]]
 count_keyboard = [["1", "5", "10"]]
 
-# Load from environment
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY")
 RUNPOD_API_SECRET = os.getenv("RUNPOD_API_SECRET")
@@ -37,8 +34,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return GENDER
 
 async def gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    gender_text = update.message.text
-    context.user_data["gender"] = gender_text
+    context.user_data["gender"] = update.message.text
     await update.message.reply_text(
         "សូមជ្រើសរើសចំនួនរូប៖",
         reply_markup=ReplyKeyboardMarkup(count_keyboard, one_time_keyboard=True, resize_keyboard=True),
@@ -48,12 +44,12 @@ async def gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         count = int(update.message.text)
-        gender = context.user_data["gender"]
+        gender = context.user_data.get("gender", "")
         is_male = "ប្រុស" in gender
 
         await update.message.reply_text("⏳ កំពុងបង្កើតរូប... សូមរងចាំ...", reply_markup=ReplyKeyboardRemove())
 
-        for _ in range(count):
+        for i in range(count):
             response = requests.post(
                 "https://api.runpod.ai/v2/stable-diffusion-v1/run",
                 headers={"Authorization": f"Bearer {RUNPOD_API_KEY}"},
@@ -64,14 +60,18 @@ async def count(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "size": "1080x1080"
                 }}
             )
+
+            logging.info(f"RunPod API response {i+1}: {response.text}")
             data = response.json()
             image_url = data.get("output", {}).get("image_url")
             if image_url:
                 await update.message.reply_photo(photo=image_url)
+            else:
+                await update.message.reply_text(f"❌ រូបទី {i+1} មិនទាន់បង្កើតបានទេ!")
 
     except Exception as e:
-        logging.error(e)
-        await update.message.reply_text("❌ មានបញ្ហាដំណើរការ!")
+        logging.error(f"Exception: {e}")
+        await update.message.reply_text("❌ មានបញ្ហាកើតឡើងក្នុងការបង្កើតរូប។")
 
     return ConversationHandler.END
 
