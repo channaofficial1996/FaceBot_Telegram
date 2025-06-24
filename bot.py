@@ -1,98 +1,59 @@
-
 import os
-import logging
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    ContextTypes,
-    ConversationHandler,
-)
 import requests
-
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-
-GENDER, COUNT = range(2)
-
-gender_keyboard = [["🧑‍🎨 ប្រុស", "👩‍🎨 ស្រី"]]
-count_keyboard = [["1", "5", "10"]]
+import zipfile
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY")
 RUNPOD_API_SECRET = os.getenv("RUNPOD_API_SECRET")
 
+reply_keyboard = [['🧑‍🎨 បុរស', '👩‍🎨 ស្រី']]
+markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "សូមជ្រើសរើសភេទ៖",
-        reply_markup=ReplyKeyboardMarkup(gender_keyboard, one_time_keyboard=True, resize_keyboard=True),
-    )
-    return GENDER
+    await update.message.reply_text("សូមជ្រើសរើសភេទ:", reply_markup=markup)
 
-async def gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["gender"] = update.message.text
-    await update.message.reply_text(
-        "សូមជ្រើសរើសចំនួនរូប៖",
-        reply_markup=ReplyKeyboardMarkup(count_keyboard, one_time_keyboard=True, resize_keyboard=True),
-    )
-    return COUNT
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    context.user_data['gender'] = 'male' if 'បុរស' in text else 'female' if 'ស្រី' in text else None
 
-async def count(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        count = int(update.message.text)
-        gender = context.user_data.get("gender", "")
-        is_male = "ប្រុស" in gender
+    if context.user_data.get('gender'):
+        await update.message.reply_text("📸 តើអ្នកចង់បានរូបប៉ុន្មាន?", reply_markup=ReplyKeyboardMarkup(
+            [['1', '5', '10']], one_time_keyboard=True, resize_keyboard=True))
+    elif text in ['1', '5', '10'] and context.user_data.get('gender'):
+        quantity = int(text)
+        gender = context.user_data['gender']
+        await update.message.reply_text("⏳ កំពុងបង្កើតរូប... សូមមេត្តារងចាំ")
 
-        await update.message.reply_text("⏳ កំពុងបង្កើតរូប... សូមរងចាំ...", reply_markup=ReplyKeyboardRemove())
+        images = []
+        for i in range(quantity):
+            prompt = f"face only portrait of a {gender} person, white background, 1080x1080, clean, AI generated"
+            headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
+            res = requests.post("https://api.runpod.ai/v2/realistic-vision-v51/run", json={"input": {"prompt": prompt}}, headers=headers)
 
-        for i in range(count):
-            response = requests.post(
-                "https://api.runpod.ai/v2/stable-diffusion-v1/run",
-                headers={"Authorization": f"Bearer {RUNPOD_API_KEY}"},
-                json={"input": {
-                    "prompt": f"{'handsome male face' if is_male else 'beautiful female face'}, white background, centered headshot, 1080x1080",
-                    "num_inference_steps": 25,
-                    "guidance_scale": 7.5,
-                    "size": "1080x1080"
-                }}
-            )
+            try:
+                output_url = res.json()['output'][0]
+                img_data = requests.get(output_url).content
+                file_path = f"/mnt/data/{gender}_{i}.png"
+                with open(file_path, 'wb') as f:
+                    f.write(img_data)
+                images.append(file_path)
+            except Exception:
+                await update.message.reply_text("❌ មិនអាចទាញយករូបបានទេ!")
+                return
 
-            logging.info(f"RunPod API response {i+1}: {response.text}")
-            data = response.json()
-            image_url = data.get("output", {}).get("image_url")
-            if image_url:
-                await update.message.reply_photo(photo=image_url)
-            else:
-                await update.message.reply_text(f"❌ រូបទី {i+1} មិនទាន់បង្កើតបានទេ!")
+        if quantity < 50:
+            for img_path in images:
+                await update.message.reply_photo(photo=open(img_path, 'rb'))
+        else:
+            zip_path = f"/mnt/data/{gender}_faces.zip"
+            with zipfile.ZipFile(zip_path, 'w') as zipf:
+                for img_path in images:
+                    zipf.write(img_path, arcname=os.path.basename(img_path))
+            await update.message.reply_document(document=open(zip_path, 'rb'))
 
-    except Exception as e:
-        logging.error(f"Exception: {e}")
-        await update.message.reply_text("❌ មានបញ្ហាកើតឡើងក្នុងការបង្កើតរូប។")
-
-    return ConversationHandler.END
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("បានបោះបង់!", reply_markup=ReplyKeyboardRemove())
-    return ConversationHandler.END
-
-def run_bot():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            GENDER: [MessageHandler(filters.TEXT & ~filters.COMMAND, gender)],
-            COUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, count)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-
-    app.add_handler(conv_handler)
-    app.run_polling()
-
-if __name__ == "__main__":
-    run_bot()
+app = ApplicationBuilder().token(BOT_TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.run_polling()
